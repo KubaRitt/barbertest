@@ -1,7 +1,6 @@
 const fs = require("fs");
 const axios = require("axios");
 
-// Transcribe caller audio
 async function transcribeAudio(filePath) {
   const resp = await axios.post(
     "https://api.openai.com/v1/audio/transcriptions",
@@ -17,7 +16,6 @@ async function transcribeAudio(filePath) {
   return resp.data.text;
 }
 
-// Generate AI response
 async function getAIResponse(prompt) {
   const resp = await axios.post(
     "https://api.openai.com/v1/chat/completions",
@@ -30,7 +28,6 @@ async function getAIResponse(prompt) {
   return resp.data.choices[0].message.content;
 }
 
-// Convert text to speech
 async function textToSpeech(text, outputFile) {
   const resp = await axios.post(
     "https://api.openai.com/v1/audio/speech",
