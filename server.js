@@ -1,45 +1,50 @@
 require("dotenv").config();
-const Srf = require("drachtio-srf");
-const srf = new Srf();
+const SIP = require("sip.js");
+const fs = require("fs");
 const { spawn } = require("child_process");
 const { transcribeAudio, getAIResponse, textToSpeech } = require("./aiHandler");
 
-const SIP_USERNAME = "313914";
+// Zadarma SIP credentials
+const SIP_URI = "sip:313914@sip.zadarma.com";
 const SIP_PASSWORD = process.env.SIP_PASSWORD;
 const SIP_SERVER = "sip.zadarma.com";
 
-srf.connect({
-  host: SIP_SERVER,
-  port: 5060,
-  protocol: "udp",
-  localAddress: "0.0.0.0",
+// Configure UserAgent
+const userAgent = new SIP.UA({
+  uri: SIP_URI,
+  transportOptions: {
+    wsServers: [`wss://${SIP_SERVER}`], // sip.js requires WebSocket transport
+  },
+  authorizationUser: "313914",
+  password: SIP_PASSWORD,
 });
 
-srf.on("connect", () => console.log("Connected to SIP server"));
-srf.on("error", (err) => console.error(err));
-
-srf.invite(async (req, res) => {
+// Listen for incoming calls
+userAgent.on("invite", (session) => {
   console.log("Incoming call...");
-  const dlg = await res.send(200);
+  session.accept();
 
   const callerAudio = "caller.wav";
   const replyAudio = "reply.wav";
 
   console.log("Recording caller audio for 5 seconds...");
+
+  // Record audio from mic (simple approach)
   const record = spawn("arecord", ["-f", "cd", "-d", "5", callerAudio]);
   record.on("exit", async () => {
-    console.log("Audio recorded. Transcribing...");
+    console.log("Audio recorded, transcribing...");
     const text = await transcribeAudio(callerAudio);
     console.log("Caller said:", text);
 
-    const responseText = await getAIResponse(text);
-    console.log("AI response:", responseText);
+    const aiResponse = await getAIResponse(text);
+    console.log("AI response:", aiResponse);
 
-    await textToSpeech(responseText, replyAudio);
+    await textToSpeech(aiResponse, replyAudio);
     console.log("Playing reply...");
+
     spawn("aplay", [replyAudio]);
 
-    // End the call after 1 second
-    setTimeout(() => dlg.destroy(), 1000);
+    // End call after reply
+    setTimeout(() => session.bye(), 1000);
   });
 });
